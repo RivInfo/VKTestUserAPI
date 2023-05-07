@@ -79,11 +79,14 @@ public class UserController : ControllerBase
             return BadRequest();
 
         UserState userState = await _userContext.UsersState
-            .FirstAsync(x => x.Id == user.Id);
-        
+            .FirstAsync(x => x.Id == user.UserStateId);
+
         userState.Code = UserStateCode.Blocked;
 
         await _userContext.SaveChangesAsync();
+        
+        await _userContext.UsersGroup
+            .FirstAsync(x => x.Id == user.UserGroupId);
 
         return Ok(user);
     }

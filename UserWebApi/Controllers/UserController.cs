@@ -11,13 +11,11 @@ namespace UserWebApi.Controllers;
 [Route("[controller]")]
 public class UserController : ControllerBase
 {
-    private readonly ILogger<UserController> _logger;
     private readonly UserContext _userContext;
     private readonly ILoginBlock _loginBlock;
 
-    public UserController(ILogger<UserController> logger, UserContext userContext, ILoginBlock loginBlock)
+    public UserController(UserContext userContext, ILoginBlock loginBlock)
     {
-        _logger = logger;
         _userContext = userContext;
         _loginBlock = loginBlock;
     }
@@ -29,12 +27,12 @@ public class UserController : ControllerBase
         {
             UserGroup? userGroupAdmin =
                 await _userContext.UsersGroup.FirstOrDefaultAsync(x => x.Code == UserGroupCode.Admin);
-
+            
             if (userGroupAdmin != null)
                 return BadRequest();
         }
 
-        if (await GetUserByLogin(createRequest.Login) != null)
+        if (await GetUserByLoginAsync(createRequest.Login) != null)
             return BadRequest();
 
         if (!_loginBlock.TryBlockLogin(createRequest.Login))
@@ -65,6 +63,8 @@ public class UserController : ControllerBase
 
         await _userContext.SaveChangesAsync();
 
+        await Task.Delay(5000);
+
         _loginBlock.UnblockLogin(createRequest.Login);
 
         return Ok(newUser.Entity);
@@ -73,7 +73,7 @@ public class UserController : ControllerBase
     [HttpDelete]
     public async Task<ActionResult<User>> DeleteUser(string login)
     {
-        User? user = await GetUserByLogin(login);
+        User? user = await GetUserByLoginAsync(login);
         
         if (user == null)
             return BadRequest();
@@ -91,7 +91,7 @@ public class UserController : ControllerBase
         return Ok(user);
     }
 
-    [HttpGet]
+    [HttpGet("Users")]
     public async Task<ActionResult<List<User>>> GetUsers()
     {
         await _userContext.UsersGroup.LoadAsync();
@@ -101,8 +101,38 @@ public class UserController : ControllerBase
 
         return Ok(users);
     }
+    
+    [HttpGet("{login}")]
+    public async Task<ActionResult<User>> GetUser(string login)
+    {
+        User? user = await GetUserByLoginAsync(login);
+        
+        if (user == null)
+            return BadRequest();
+        
+        await _userContext.UsersGroup
+            .FirstAsync(x => x.Id == user.UserGroupId);
+        await _userContext.UsersState
+            .FirstAsync(x => x.Id == user.UserStateId);
 
-    private async Task<User?> GetUserByLogin(string login)
+        return Ok(user);
+    }
+    
+    [HttpGet("PaginatedUsers")]
+    public async Task<ActionResult<List<User>>> GetUsersPaginated(int from = 0, int size = 5)
+    {
+        if (from < 0 || size <= 0)
+            return BadRequest();
+        
+        var users = _userContext.Users
+            .Include(x => x.UserGroup)
+            .Include(x => x.UserState);
+        
+        List<User> usersList = await users.Skip(from).Take(size).ToListAsync();
+        return Ok(usersList);
+    }
+
+    private async Task<User?> GetUserByLoginAsync(string login)
     {
         return await _userContext.Users
             .FirstOrDefaultAsync(x => x.Login == login);

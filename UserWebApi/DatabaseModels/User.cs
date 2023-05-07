@@ -17,13 +17,9 @@ public class User
 
     [JsonIgnore]
     [Column("user_group_id")] public long UserGroupId { get; set; }
-
-    //[ForeignKey("user_group_id")]
     public UserGroup UserGroup { get; set; }
     
     [JsonIgnore]
     [Column("user_state_id")] public long UserStateId { get; set; }
-
-    //[ForeignKey("user_state_id")]
     public UserState UserState { get; set; }
 }
